@@ -15,7 +15,6 @@ SELECT 	ST_UNION((SELECT ST_TRANSFORM(ST_SetSRID(geom, 4326),2163) FROM area_pri
 --block_groups is the block group shapefile
 --This might take some time		
 DROP TABLE IF EXISTS service_area_blocks;
-
 CREATE TEMP TABLE service_area_blocks AS
 SELECT gid, aland10, awater10, poptotal, geom
 FROM block_groups AS b
@@ -27,6 +26,7 @@ WHERE ST_INTERSECTS(ST_TRANSFORM(ST_SetSRID(b.geom,4326),2163),(SELECT geom FROM
 
 --Trim above table to exact only service area
 --Also takes some time to run
+DROP TABLE IF EXISTS service_area_blocks_trimmed;
 CREATE TEMP TABLE service_area_blocks_trimmed AS
 SELECT 	gid, aland10, awater10, poptotal
 		, ST_INTERSECTION(ST_TRANSFORM(ST_SetSRID(b.geom,4326),2163),(SELECT geom FROM service_area)) AS geom
@@ -75,7 +75,8 @@ FROM	service_area_blocks_trimmed b
 --Base Coverage Table
 --This holds the geometries of block groups, and proportion served
 --Proportion is calculated by area of block group intersecting 
---with buffer around all stops
+--with buffer around all stops as a proportion of total area.
+--This assumes that population density is even within a block.
 DROP TABLE IF EXISTS base_coverage;
 CREATE TABLE base_coverage AS
 SELECT gid, poptotal, poptotal*ST_AREA(served_geom)/aland10 AS servedpop, 100*ST_AREA(served_geom)/aland10 AS servedpopprop, geom
@@ -117,7 +118,6 @@ SELECT 	ST_INTERSECTION((SELECT geom FROM service_area)
 	--SELECT ST_TRANSFORM(geom, 4326) FROM freq_mbta_buffer
 
 -- Intersect with with trimmed service blocks
-DROP TABLE IF EXISTS mbta_freq_coverage;
 CREATE TEMP TABLE mbta_freq_coverage AS
 SELECT 	gid, aland10, awater10, poptotal, b.geom
 		, ST_INTERSECTION(b.geom,(SELECT geom FROM freq_mbta_buffer)) AS served_geom
@@ -125,7 +125,8 @@ FROM	service_area_blocks_trimmed b
 	--Query returned successfully in 25 secs 115 msec.
 	--SELECT * FROM mbta_freq_coverage
 
--- Find block density in service area and proportion in only dense areas
+-- Find block density in service area and proportion in ONLY dense areas
+DROP TABLE IF EXISTS mbta_dense_coverage;
 CREATE TABLE mbta_dense_coverage AS
 SELECT 	b.gid, b.aland10, b.awater10, b.poptotal, mb.geom, mb.served_geom
 FROM	service_area_blocks_trimmed AS b

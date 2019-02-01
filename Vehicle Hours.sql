@@ -27,7 +27,6 @@ FROM gtfs_stop_times
 GROUP BY trip_id;
 --SELECT * FROM trip_start_end LIMIT 100
 
-
 -- WEEKDAY VEHICLE HOURS BY ROUTE_DESC
 -- Find run times for each trip, and aggregate by type
 SELECT route_desc, SUM(travel_time) AS travel_time
