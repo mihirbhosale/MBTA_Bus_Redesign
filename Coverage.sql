@@ -1,6 +1,8 @@
+---------------------------------------------------------------------------------
 ----- INITIALIZE
+---------------------------------------------------------------------------------
 -- MBTA Service Area: Union of the two areas
--- area_primary is the inner service area,
+-- area_primary is the inner service area shapefile,
 -- area_secondary is the outer one
 DROP TABLE IF EXISTS service_area;
 CREATE TABLE service_area AS
@@ -10,6 +12,7 @@ SELECT 	ST_UNION((SELECT ST_TRANSFORM(ST_SetSRID(geom, 4326),2163) FROM area_pri
 	--SELECT ST_TRANSFORM(ST_SetSRID(geom, 4326),2136) FROM area_primary
 
 --Blocks only within MBTA Service Area
+--block_groups is the block group shapefile
 --This might take some time		
 DROP TABLE IF EXISTS service_area_blocks;
 
@@ -22,7 +25,7 @@ WHERE ST_INTERSECTS(ST_TRANSFORM(ST_SetSRID(b.geom,4326),2163),(SELECT geom FROM
 	--Test
 	--SELECT geom FROM service_area_blocks UNION SELECT * FROM mbta_buffer
 
---Trim above table to exact service area
+--Trim above table to exact only service area
 --Also takes some time to run
 CREATE TEMP TABLE service_area_blocks_trimmed AS
 SELECT 	gid, aland10, awater10, poptotal
@@ -30,7 +33,9 @@ SELECT 	gid, aland10, awater10, poptotal
 FROM	service_area_blocks b
 	--Query returned successfully in 9 min 17 secs.
 
+---------------------------------------------------------------------------------
 ----- BASE COVERAGE
+---------------------------------------------------------------------------------
 --Get all bus, rapid transit, commuter rail, ferry stops
 --(As per the service policy, all modes are to be included)
 DROP TABLE IF EXISTS all_stops;
@@ -52,7 +57,7 @@ FROM all_stops;
 	--Test					   
 	--SELECT ST_TRANSFORM(the_geom,4326) FROM service_buffer
 
---Buffer Area only within MBTA Service Area
+--Clip Buffer Area only within MBTA Service Area
 CREATE TEMP TABLE mbta_buffer AS
 SELECT 	ST_INTERSECTION((SELECT geom FROM service_area)
 				 	   ,(SELECT the_geom FROM service_buffer)) AS geom
@@ -68,15 +73,20 @@ FROM	service_area_blocks_trimmed b
 --Query returned successfully in 5 min 22 secs.
 
 --Base Coverage Table
+--This holds the geometries of block groups, and proportion served
+--Proportion is calculated by area of block group intersecting 
+--with buffer around all stops
+DROP TABLE IF EXISTS base_coverage;
 CREATE TABLE base_coverage AS
 SELECT gid, poptotal, poptotal*ST_AREA(served_geom)/aland10 AS servedpop, 100*ST_AREA(served_geom)/aland10 AS servedpopprop, geom
 FROM mbta_base_coverage
 WHERE aland10 > 0
 	--SELECT SUM(servedpop)/SUM(poptotal)*100 FROM base_coverage
-	--This gives the overall percentage of base coverage
+	--^^This gives the overall percentage of base coverage
 
-
+---------------------------------------------------------------------------------
 ----- FREQUENT COVERAGE
+---------------------------------------------------------------------------------
 --Get all key bus route and rapid transit stops
 --(As per the service policy, all modes are to be included)
 DROP TABLE IF EXISTS freq_stops;
